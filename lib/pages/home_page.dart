@@ -4,6 +4,7 @@ import '../herald_store.dart';
 import '../theme.dart';
 import '../widgets/h_card.dart';
 import '../widgets/task_row.dart';
+import '../day_listen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.onChanged});
@@ -91,9 +92,18 @@ class _HomePageState extends State<HomePage> {
                 Switch(
                   value: store.dayOn,
                   activeThumbColor: teal,
-                  onChanged: (v) {
-                    setState(() => store.dayOn = v);
+                  onChanged: (v) async {
+                    var error = '';
+                    if (v) {
+                      error = await startListening();
+                    } else {
+                      await stopListen();
+                    }
                     widget.onChanged();
+                    if (mounted) setState(() {});
+                    if (error.isNotEmpty && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+                    }
                   },
                 ),
               ],
@@ -146,9 +156,19 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: () {
-                    setState(() => store.dayOn = !store.dayOn);
+                  onPressed: () async {
+                    if (store.dayOn) {
+                      await stopListen();
+                      setState(() {});
+                      widget.onChanged();
+                      return;
+                    }
+                    final err = await startListening();
+                    setState(() {});
                     widget.onChanged();
+                    if (err.isNotEmpty && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+                    }
                   },
                   icon: Icon(store.dayOn ? Icons.stop : Icons.mic_none),
                   label: Text(store.dayOn ? 'Stop Herald' : 'Start Herald'),

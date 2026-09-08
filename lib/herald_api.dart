@@ -11,27 +11,23 @@ Future<void> sendChunk(String text) async {
   final chunk = {
     'id': DateTime.now().millisecondsSinceEpoch.toString(),
     'text': t,
-    'timestamp': DateTime.now().toUtc().toIso8601String(),
+    'timestamp': DateTime.now().toIso8601String(),
     'speaker': 'me',
     'source': 'typed',
   };
 
   try {
-    final res = await http
+    await http
         .post(
       Uri.parse('$backend/api/chunks'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode([chunk]),
     )
         .timeout(const Duration(seconds: 4));
-    if (res.statusCode != 200) return;
-    final data = jsonDecode(res.body);
-    if (data is Map<String, dynamic>) applySnapshot(data);
   } catch (_) {
-    // local classify already ran; Python is optional
+    // laptop brain is optional
   }
 }
-
 void applySnapshot(Map<String, dynamic> s) {
   store.items.clear();
   store.events.clear();

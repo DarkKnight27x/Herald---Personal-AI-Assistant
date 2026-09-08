@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'pages/shell.dart';
 import 'theme.dart';
+import 'herald_store.dart';
 
-void main() => runApp(const HeraldApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await store.restore();
+  runApp(const HeraldApp());
+}
 
 class HeraldApp extends StatelessWidget {
   const HeraldApp({super.key});

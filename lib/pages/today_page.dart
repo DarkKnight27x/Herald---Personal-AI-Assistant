@@ -64,6 +64,7 @@ class TodayPage extends StatelessWidget {
                   due: e.due,
                   onDone: () {
                     store.markDone(e.id);
+                    markDoneRemote(e.id);
                     onChanged();
                   },
                 ),
