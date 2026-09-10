@@ -75,9 +75,72 @@ class HeraldStore {
   bool airplaneDemo = false;
   String lastLaptopAt = '';
   bool enrollPending = false;
+  String lastPartial = '';
+  String lastStamp = '';
+  String sessionNote = '';
+  void Function()? onUi;
   int _n = 0;
 
+  void ping() {
+    onUi?.call();
+  }
+
   List<String> get lines => chat.map((e) => e.text).toList();
+  List<Map<String, String>> get thread {
+    final rows = chat.reversed.toList();
+    return [
+      for (final line in rows)
+        {
+          'clock': _clock(line.at),
+          'who': line.speaker == 'other' ? 'them' : 'you',
+          'text': line.text,
+          'why': whyKept(line.text, line.speaker),
+        }
+    ];
+  }
+
+  String _clock(String iso) {
+    final at = DateTime.tryParse(iso)?.toLocal();
+    if (at == null) return '--:--';
+    final h = at.hour.toString().padLeft(2, '0');
+    final m = at.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  String whyKept(String raw, [String speaker = 'me']) {
+    final t = raw.toLowerCase();
+    if (t.contains('deadline') || t.contains('due by') || t.contains('due on')) {
+      return 'Kept as a deadline so the date does not slip.';
+    }
+    if (t.contains('meet') || t.contains('meeting') || t.contains('sync with')) {
+      return 'Kept as a meeting. It stays proposed until you confirm.';
+    }
+    if (t.contains('remind me') ||
+        t.contains("don't forget") ||
+        t.contains('dont forget')) {
+      return 'Kept as a reminder you asked Herald to hold.';
+    }
+    if (t.contains('we decided') ||
+        t.contains('decided to') ||
+        t.contains('is handling') ||
+        t.contains('in charge')) {
+      return 'Kept as life memory — a fact about your world, not a task.';
+    }
+    if (t.contains("i'll") ||
+        t.contains('i will') ||
+        t.contains('i need') ||
+        t.contains('need to') ||
+        t.contains('have to') ||
+        t.contains('make ') ||
+        t.contains('call ') ||
+        t.contains('send ')) {
+      if (speaker == 'other') {
+        return 'Kept as theirs. This is a follow-up, not your promise.';
+      }
+      return 'Kept as your commitment — a promise you made.';
+    }
+    return 'Heard and stored on this phone. Not a task.';
+  }
 
   String _id(String p) {
     _n++;
@@ -89,6 +152,8 @@ class HeraldStore {
     if (t.isEmpty) return;
     last = t;
     lastSpeaker = speaker;
+    lastPartial = '';
+    lastStamp = '';
     chat.insert(
       0,
       HeraldLine(
@@ -168,19 +233,75 @@ class HeraldStore {
       'Sunday',
     ];
     final open = items.length;
-    final meets = events.where((e) => _sameDay(parseHeraldDue(e.whenText, rollPast: false), now)).length;
+    final meets = events
+        .where((e) =>
+            _sameDay(parseHeraldDue(e.whenText, rollPast: false), now))
+        .length;
     final mine = items.where((e) => e.owner != 'other').length;
     final theirs = items.where((e) => e.owner == 'other').length;
     final bits = <String>[
       '${days[now.weekday - 1]}.',
-      if (open == 0) 'Your plate is clear.' else '$open open ${open == 1 ? 'item' : 'items'}.',
+      if (open == 0)
+        'Your plate is clear.'
+      else
+        '$open open ${open == 1 ? 'item' : 'items'}.',
       if (meets > 0) '$meets on the calendar today.',
-      if (theirs > 0) '$theirs ${theirs == 1 ? 'is' : 'are'} theirs, not yours.',
+      if (theirs > 0)
+        '$theirs ${theirs == 1 ? 'is' : 'are'} theirs, not yours.',
       if (mine > 0 && open > 0) 'You still have $mine of your own.',
-      if (weeklyDone.isNotEmpty) 'You kept your word ${weeklyDone.length} ${weeklyDone.length == 1 ? 'time' : 'times'} this week.',
-      if (memories.isNotEmpty) 'Life memory is holding ${memories.length} ${memories.length == 1 ? 'fact' : 'facts'}.',
+      if (weeklyDone.isNotEmpty)
+        'You kept your word ${weeklyDone.length} ${weeklyDone.length == 1 ? 'time' : 'times'} this week.',
+      if (memories.isNotEmpty)
+        'Life memory is holding ${memories.length} ${memories.length == 1 ? 'fact' : 'facts'}.',
     ];
-    return bits.join(' ');
+       return bits.join(' ');
+  }
+
+  String get eveningNote {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final day = days[DateTime.now().weekday - 1];
+    final mine = items.where((e) => e.owner != 'other').toList();
+    final theirs = items.where((e) => e.owner == 'other').toList();
+    final proposed = events.where((e) => !e.confirmed).toList();
+    final bits = <String>[
+      '$day. ${items.length} still open.',
+      if (mine.isNotEmpty) 'You still owe: ${mine.first.text}.',
+      if (theirs.isNotEmpty) 'Theirs: ${theirs.first.text}.',
+      if (proposed.isNotEmpty)
+        'A meeting is still proposed: ${proposed.first.title}.'
+      else if (events.isNotEmpty)
+        'Calendar is confirmed.',
+      if (weeklyDone.isNotEmpty)
+        'You kept your word ${weeklyDone.length} ${weeklyDone.length == 1 ? 'time' : 'times'}.',
+      if (memories.isNotEmpty) memories.first,
+    ];
+    return bits.take(5).join('\n');
+  }
+
+  void hearPartial(String text) {
+    lastPartial = text.trim();
+    ping();
+  }
+
+  void captureStop() {
+    lastPartial = '';
+    final bits = dailySummary.split('. ');
+    sessionNote = bits.take(2).where((s) => s.trim().isNotEmpty).join('. ');
+    if (sessionNote.isNotEmpty && !sessionNote.endsWith('.')) {
+      sessionNote = '$sessionNote.';
+    }
+    if (sessionNote.isEmpty) {
+      sessionNote = 'Stopped. Nothing stored yet.';
+    }
+    ping();
   }
 
   String ask(String q) {
@@ -191,7 +312,9 @@ class HeraldStore {
       return 'You promised:\n${hits.map((e) => '• ${e.text}').join('\n')}';
     }
     if (s.contains('they') || s.contains('other') || s.contains('someone else')) {
-      final hits = items.where((e) => e.owner == 'other' || e.type == 'followup').toList();
+      final hits = items
+          .where((e) => e.owner == 'other' || e.type == 'followup')
+          .toList();
       if (hits.isEmpty) return 'Nothing tagged as someone else.';
       return 'Theirs:\n${hits.map((e) => '• ${e.text}').join('\n')}';
     }
@@ -200,7 +323,9 @@ class HeraldStore {
         final due = parseHeraldDue(e.due, rollPast: false);
         if (due == null) return e.due.toLowerCase().contains('tomorrow');
         final tom = DateTime.now().add(const Duration(days: 1));
-        return due.year == tom.year && due.month == tom.month && due.day == tom.day;
+        return due.year == tom.year &&
+            due.month == tom.month &&
+            due.day == tom.day;
       }).toList();
       if (hits.isEmpty) return 'Nothing dated tomorrow.';
       return 'Tomorrow:\n${hits.map((e) => '• ${e.text}').join('\n')}';
@@ -247,6 +372,7 @@ class HeraldStore {
         t.contains('is handling') ||
         t.contains('in charge')) {
       memories.insert(0, title);
+      lastStamp = 'memory · on this phone';
     } else if (t.contains("i'll") ||
         t.contains('i will') ||
         t.contains('i need') ||
@@ -258,7 +384,15 @@ class HeraldStore {
       type = speaker == 'other' ? 'followup' : 'commitment';
       due = _due(raw);
     }
-    if (type.isEmpty || _isDuplicate(title, due)) return;
+    if (type.isEmpty || _isDuplicate(title, due)) {
+      if (lastStamp.isEmpty) lastStamp = 'heard · on this phone';
+      return;
+    }
+    lastStamp = [
+      type,
+      if (due.isNotEmpty) due,
+      'on this phone',
+    ].join(' · ');
     final item = HeraldItem(
       id: _id('i'),
       type: type,

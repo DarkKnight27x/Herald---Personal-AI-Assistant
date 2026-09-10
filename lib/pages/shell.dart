@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../herald_api.dart';
+import '../herald_store.dart';
 import '../theme.dart';
 import 'calendar_page.dart';
 import 'home_page.dart';
@@ -24,6 +25,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    store.onUi = () {
+      if (mounted) setState(() {});
+    };
     _poll = Timer.periodic(const Duration(seconds: 6), (_) => _sync());
     unawaited(_sync());
   }
@@ -31,6 +35,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _poll?.cancel();
+    if (store.onUi != null) store.onUi = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

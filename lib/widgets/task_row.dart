@@ -12,6 +12,7 @@ class TaskRow extends StatelessWidget {
     required this.title,
     this.due = '',
     this.note = '',
+    this.theirs = false,
     this.onDone,
   });
 
@@ -19,10 +20,12 @@ class TaskRow extends StatelessWidget {
   final String title;
   final String due;
   final String note;
+  final bool theirs;
   final VoidCallback? onDone;
 
   @override
   Widget build(BuildContext context) {
+    final showTheirs = theirs || note.toLowerCase() == 'theirs';
     return HCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,16 +47,32 @@ class TaskRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     TypePill(type),
-                    if (note.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        note,
-                        style: const TextStyle(color: muted, fontSize: 12),
+                    if (showTheirs)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF9A6B4F),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: const Text(
+                          'THEIRS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 4),

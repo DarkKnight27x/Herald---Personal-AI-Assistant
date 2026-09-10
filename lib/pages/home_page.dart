@@ -14,13 +14,36 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   final typed = TextEditingController();
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    );
+    if (store.dayOn) _pulse.repeat(reverse: true);
+  }
 
   @override
   void dispose() {
+    _pulse.dispose();
     typed.dispose();
     super.dispose();
+  }
+
+  void _syncPulse() {
+    if (store.dayOn) {
+      if (!_pulse.isAnimating) _pulse.repeat(reverse: true);
+    } else if (_pulse.isAnimating) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
   }
 
   Future<void> _send([String? value]) async {
@@ -45,6 +68,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    _syncPulse();
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
@@ -132,9 +156,22 @@ class _HomePageState extends State<HomePage> {
           HCard(
             child: Row(
               children: [
-                const CircleAvatar(
-                  backgroundColor: mint,
-                  child: Icon(Icons.verified_user, color: teal),
+                AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (context, child) {
+                    final glow =
+                        store.dayOn ? 0.35 + (_pulse.value * 0.55) : 1.0;
+                    return Opacity(
+                      opacity: glow,
+                      child: CircleAvatar(
+                        backgroundColor: store.dayOn ? teal : mint,
+                        child: Icon(
+                          store.dayOn ? Icons.graphic_eq : Icons.verified_user,
+                          color: store.dayOn ? Colors.white : teal,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -150,7 +187,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                       Text(
                         store.dayOn
-                            ? 'On — Herald keeps listening on this phone'
+                            ? (store.lastPartial.isEmpty
+                                ? 'Listening on this phone'
+                                : 'Hearing you…')
                             : 'Off until you need it',
                         style: const TextStyle(color: muted, fontSize: 13),
                       ),
@@ -167,6 +206,7 @@ class _HomePageState extends State<HomePage> {
                     } else {
                       await stopListen();
                     }
+                    _syncPulse();
                     widget.onChanged();
                     if (mounted) setState(() {});
                     if (error.isNotEmpty && mounted) {
@@ -199,21 +239,30 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  store.last.isEmpty ? 'Nothing yet today.' : '“${store.last}”',
-                  style: const TextStyle(
+                  store.lastPartial.isNotEmpty
+                      ? store.lastPartial
+                      : store.last.isEmpty
+                          ? 'Nothing yet today.'
+                          : '“${store.last}”',
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: navy,
+                    fontStyle: store.lastPartial.isNotEmpty
+                        ? FontStyle.italic
+                        : FontStyle.normal,
+                    color: store.lastPartial.isNotEmpty ? muted : navy,
                     height: 1.3,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  store.last.isEmpty
-                      ? 'Held on this phone only'
-                      : store.lastSpeaker == 'other'
-                          ? 'Tagged as someone else'
-                          : 'Tagged as you',
+                  store.lastStamp.isNotEmpty
+                      ? store.lastStamp
+                      : store.last.isEmpty
+                          ? 'Held on this phone only'
+                          : store.lastSpeaker == 'other'
+                              ? 'Tagged as someone else'
+                              : 'Tagged as you',
                   style: const TextStyle(color: muted, fontSize: 12),
                 ),
                 if (store.last.isNotEmpty && store.knowMyVoice) ...[
@@ -244,6 +293,60 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+          if (store.sessionNote.isNotEmpty && !store.dayOn) ...[
+            const SizedBox(height: 10),
+            HCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SO FAR TODAY',
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 1,
+                      color: muted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    store.sessionNote,
+                    style: const TextStyle(
+                      color: navy,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+                    if (store.chat.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            HCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'EVENING NOTE',
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 1,
+                      color: muted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    store.eveningNote,
+                    style: const TextStyle(
+                      color: navy,
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (store.followUps.isNotEmpty) ...[
             const SizedBox(height: 10),
             HCard(
@@ -310,11 +413,13 @@ class _HomePageState extends State<HomePage> {
                   onPressed: () async {
                     if (store.dayOn) {
                       await stopListen();
+                      _syncPulse();
                       setState(() {});
                       widget.onChanged();
                       return;
                     }
                     final err = await startDayMode();
+                    _syncPulse();
                     setState(() {});
                     widget.onChanged();
                     if (err.isNotEmpty && context.mounted) {
@@ -363,7 +468,10 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 10),
           if (store.items.isEmpty)
-            const Text('Nothing in orbit yet.', style: TextStyle(color: muted))
+            const Text(
+              'Nothing in orbit yet. Say “I’ll send Rahul the database tonight.”',
+              style: TextStyle(color: muted),
+            )
           else
             ...store.items.take(3).map(
                   (e) => Padding(

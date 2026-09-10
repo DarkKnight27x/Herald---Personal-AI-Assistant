@@ -13,11 +13,11 @@ const _voicePackMissing = 'Voice pack missing. Use + to type.';
 final _vosk = VoskFlutterPlugin.instance();
 SpeechService? _speechService;
 StreamSubscription<dynamic>? _results;
+StreamSubscription<dynamic>? _partials;
 bool _starting = false;
 bool _busy = false;
 Completer<String>? _once;
 
-/// Continuous Day Mode. Stays on until [stopListen].
 Future<String> startDayMode() async {
   if (_starting) return '';
   if (store.dayOn && _speechService != null) return '';
@@ -31,7 +31,10 @@ Future<String> startDayMode() async {
   try {
     await _prepareSpeechService();
     store.dayOn = true;
+    store.lastPartial = '';
+    store.sessionNote = '';
     await store.persist();
+    store.ping();
     await _speechService!.start(onRecognitionError: (_) {
       unawaited(stopListen());
     });
@@ -39,13 +42,13 @@ Future<String> startDayMode() async {
   } catch (_) {
     store.dayOn = false;
     await store.persist();
+    store.ping();
     return 'Voice recognition is unavailable. Use + to type.';
   } finally {
     _starting = false;
   }
 }
 
-/// One recognition turn. Used by voice enrollment.
 Future<String> listenOnce() async {
   final missing = await _ensureModel();
   if (missing != null) return missing;
@@ -90,6 +93,15 @@ Future<void> _prepareSpeechService() async {
   );
   _speechService = await _vosk.initSpeechService(recognizer);
   _results = _speechService!.onResult().listen(_onFinalResult);
+  _partials = _speechService!.onPartial().listen(_onPartial);
+}
+
+void _onPartial(dynamic raw) {
+  if (_once != null) return;
+  if (!store.dayOn) return;
+  final heard = _partialText('$raw');
+  if (heard.isEmpty) return;
+  store.hearPartial(heard);
 }
 
 void _onFinalResult(dynamic raw) {
@@ -106,9 +118,25 @@ void _onFinalResult(dynamic raw) {
 String _resultText(String raw) {
   try {
     final decoded = jsonDecode(raw);
-    if (decoded is Map) return '${decoded['text'] ?? ''}'.trim();
+    if (decoded is Map) {
+      final text = '${decoded['text'] ?? ''}'.trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'nun') return text;
+    }
   } catch (_) {}
-  return raw.trim();
+  final t = raw.trim();
+  if (t.isEmpty || t.toLowerCase() == 'nun') return '';
+  return t;
+}
+
+String _partialText(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map) {
+      final text = '${decoded['partial'] ?? decoded['text'] ?? ''}'.trim();
+      if (text.isNotEmpty && text.toLowerCase() != 'nun') return text;
+    }
+  } catch (_) {}
+  return '';
 }
 
 Future<void> _accept(String heard) async {
@@ -121,12 +149,16 @@ Future<void> _accept(String heard) async {
       store.enrollPending = false;
       store.last = heard;
       store.lastSpeaker = 'me';
+      store.lastPartial = '';
+      store.lastStamp = 'voice saved · on this phone';
       await store.persist();
+      store.ping();
       return;
     }
     final speaker = store.knowMyVoice ? store.nextSpeaker : 'me';
     store.nextSpeaker = 'me';
     store.add(heard, speaker: speaker, source: 'stt');
+    store.ping();
     await sendChunk(heard, speaker: speaker, source: 'stt');
   } finally {
     _busy = false;
@@ -136,9 +168,9 @@ Future<void> _accept(String heard) async {
 Future<void> stopListen() async {
   store.dayOn = false;
   store.enrollPending = false;
+  store.captureStop();
   await store.persist();
   await _speechService?.stop();
 }
 
-/// Back-compat name used by older Home buttons.
 Future<String> startListenOnce() => startDayMode();

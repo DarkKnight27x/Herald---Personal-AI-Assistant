@@ -194,19 +194,27 @@ class YouPage extends StatelessWidget {
           ),
           const SizedBox(height: 22),
           const Text(
-            'MEMORY & DEVICE',
+            'MEMORY THREAD',
             style: TextStyle(fontSize: 11, letterSpacing: 1, color: muted),
           ),
           const SizedBox(height: 8),
           HCard(
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.headset_mic_outlined, color: teal),
-              title: const Text('Chat & memory thread'),
-              subtitle: Text(
-                '${store.chat.length} lines · ${store.memories.length} facts',
-              ),
-            ),
+            child: store.thread.isEmpty
+                ? const Text(
+                    'Nothing held yet. Say “I’ll send Rahul the database tonight.”',
+                    style: TextStyle(color: muted, height: 1.4),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${store.chat.length} lines · ${store.memories.length} facts · tap a line',
+                        style: const TextStyle(color: muted, fontSize: 12),
+                      ),
+                      const SizedBox(height: 10),
+                      ...store.thread.map((beat) => _threadRow(context, beat)),
+                    ],
+                  ),
           ),
           if (store.memories.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -256,6 +264,51 @@ class YouPage extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _threadRow(BuildContext context, Map<String, String> beat) {
+  return InkWell(
+    onTap: () {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: cardBg,
+          title: Text(beat['text'] ?? ''),
+          content: Text(
+            '${beat['clock']} · ${beat['who']}\n\n${beat['why']}',
+            style: const TextStyle(height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    },
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${beat['clock']}  ${beat['who']}  ${beat['text']}',
+            style: const TextStyle(
+              color: navy,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '→ ${beat['why']}',
+            style: const TextStyle(color: muted, fontSize: 12, height: 1.3),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 Future<void> _enroll(BuildContext context) async {
