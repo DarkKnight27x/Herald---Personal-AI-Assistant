@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
+import '../herald_api.dart';
 import '../theme.dart';
+import 'calendar_page.dart';
 import 'home_page.dart';
 import 'today_page.dart';
-import 'calendar_page.dart';
 import 'week_page.dart';
 import 'you_page.dart';
 
@@ -12,8 +16,34 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int tab = 0;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _poll = Timer.periodic(const Duration(seconds: 6), (_) => _sync());
+    unawaited(_sync());
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_sync());
+  }
+
+  Future<void> _sync() async {
+    final changed = await pullSnapshot();
+    if (changed && mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {

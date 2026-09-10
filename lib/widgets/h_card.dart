@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../theme.dart';
 
 class HCard extends StatelessWidget {
-  const HCard({super.key, required this.child, this.padding = const EdgeInsets.all(16)});
+  const HCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+  });
   final Widget child;
   final EdgeInsets padding;
 

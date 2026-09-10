@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme.dart';
 import 'h_card.dart';
 import 'pretty_when.dart';
@@ -48,12 +49,22 @@ class TaskRow extends StatelessWidget {
                     TypePill(type),
                     if (note.isNotEmpty) ...[
                       const SizedBox(width: 8),
-                      Text(note, style: const TextStyle(color: muted, fontSize: 12)),
+                      Text(
+                        note,
+                        style: const TextStyle(color: muted, fontSize: 12),
+                      ),
                     ],
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: navy)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: navy,
+                  ),
+                ),
                 if (due.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(

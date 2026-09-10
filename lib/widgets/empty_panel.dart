@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../theme.dart';
 import 'h_card.dart';
 
@@ -14,9 +15,20 @@ class EmptyPanel extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 18),
         child: Column(
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: navy)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: navy,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(body, textAlign: TextAlign.center, style: const TextStyle(color: muted, height: 1.35)),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: muted, height: 1.35),
+            ),
           ],
         ),
       ),
